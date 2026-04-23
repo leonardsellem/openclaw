@@ -254,6 +254,43 @@ describe("maybeRepairLegacyCronStore", () => {
     });
   });
 
+  it("normalizes job definitions without rewriting sibling runtime state files", async () => {
+    const storePath = await makeTempStorePath();
+    const statePath = path.join(path.dirname(storePath), "jobs-state.json");
+    await writeCronStore(storePath, [createLegacyCronJob()]);
+    await fs.writeFile(
+      statePath,
+      JSON.stringify(
+        {
+          version: 1,
+          jobs: {
+            "legacy-job": {
+              lastRunStatus: "ok",
+              nextRunAtMs: Date.parse("2026-02-03T00:00:00.000Z"),
+            },
+          },
+        },
+        null,
+        2,
+      ),
+      "utf-8",
+    );
+    const beforeState = await fs.readFile(statePath, "utf-8");
+
+    await maybeRepairLegacyCronStore({
+      cfg: createCronConfig(storePath),
+      options: {},
+      prompter: makePrompter(true),
+    });
+
+    const persisted = JSON.parse(await fs.readFile(storePath, "utf-8")) as {
+      jobs: Array<Record<string, unknown>>;
+    };
+    expect(persisted.jobs[0]?.id).toBe("legacy-job");
+    expect(persisted.jobs[0]?.jobId).toBeUndefined();
+    await expect(fs.readFile(statePath, "utf-8")).resolves.toBe(beforeState);
+  });
+
   it("repairs legacy root delivery threadId hints into delivery", async () => {
     const storePath = await makeTempStorePath();
     await writeCronStore(storePath, [
