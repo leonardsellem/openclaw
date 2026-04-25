@@ -881,12 +881,6 @@ describe("windowsEscapeArg", () => {
 });
 
 describe("matchAllowlist with argPattern", () => {
-  // argPattern matching is Windows-only; skip this suite on other platforms.
-  if (process.platform !== "win32") {
-    it.skip("argPattern tests are Windows-only", () => {});
-    return;
-  }
-
   const resolution = {
     rawExecutable: "python3",
     resolvedPath: "/usr/bin/python3",
