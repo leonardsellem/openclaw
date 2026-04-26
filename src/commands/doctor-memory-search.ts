@@ -306,8 +306,8 @@ export async function maybeRepairMemoryRecallHealth(params: {
 /**
  * Check whether memory search has a usable embedding provider.
  * Runs as part of `openclaw doctor` — config-only checks where possible;
- * may spawn a short-lived probe process when `memory.backend=qmd` to verify
- * the configured `qmd` binary is available.
+ * may spawn a short-lived probe process when the active memory backend is QMD
+ * to verify the configured `qmd` binary is available.
  */
 export async function noteMemorySearchHealth(
   cfg: OpenClawConfig,
@@ -363,6 +363,9 @@ export async function noteMemorySearchHealth(
         "Memory search",
       );
     }
+    return;
+  }
+  if (backendConfig.backend === "external" && backendConfig.external?.managesEmbeddings !== false) {
     return;
   }
 

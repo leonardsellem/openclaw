@@ -190,6 +190,24 @@ describe("memory tools", () => {
     expect(getMemorySearchManagerMockCalls()).toBe(0);
   });
 
+  it("uses the active external memory manager path for memory_get", async () => {
+    setMemoryBackend("external");
+    const tool = createMemoryGetToolOrThrow();
+
+    const result = await tool.execute("call_external_manager_path", {
+      path: "memory/2026-02-19.md",
+    });
+
+    expect(result.details).toEqual({
+      text: "",
+      path: "memory/2026-02-19.md",
+      from: 1,
+      lines: 120,
+    });
+    expect(getReadAgentMemoryFileMockCalls()).toBe(0);
+    expect(getMemorySearchManagerMockCalls()).toBe(1);
+  });
+
   it("returns truncation metadata and a continuation notice for partial memory_get results", async () => {
     setMemoryBackend("builtin");
     setMemoryReadFileImpl(async (params: MemoryReadParams) => ({

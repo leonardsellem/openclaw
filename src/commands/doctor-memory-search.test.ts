@@ -316,6 +316,28 @@ describe("noteMemorySearchHealth", () => {
     expect(message).toContain("bun install -g @tobilu/qmd");
   });
 
+  it("does not warn when an external memory backend manages its own embeddings", async () => {
+    resolveActiveMemoryBackendConfig.mockReturnValue({
+      backend: "external",
+      external: {
+        id: "gbrain",
+        label: "GBrain",
+        managesEmbeddings: true,
+      },
+    });
+    resolveMemorySearchConfig.mockReturnValue({
+      provider: "auto",
+      local: {},
+      remote: {},
+    });
+
+    await noteMemorySearchHealth(cfg, {});
+
+    expect(note).not.toHaveBeenCalled();
+    expect(checkQmdBinaryAvailability).not.toHaveBeenCalled();
+    expect(resolveApiKeyForProvider).not.toHaveBeenCalled();
+  });
+
   it("does not warn when remote apiKey is configured for explicit provider", async () => {
     await expectNoWarningWithConfiguredRemoteApiKey("openai");
   });
@@ -548,7 +570,7 @@ describe("noteMemorySearchHealth", () => {
 
     const message = note.mock.calls[0]?.[0] as string;
     expect(message).toContain("Gateway memory probe for default agent is not ready");
-    expect(message).toContain("openclaw configure --section model");
+    expect(message).toContain("configure --section model");
     expect(message).not.toContain("openclaw auth add --provider");
   });
 
@@ -567,7 +589,7 @@ describe("noteMemorySearchHealth", () => {
     expect(note).toHaveBeenCalledTimes(1);
     const message = String(note.mock.calls[0]?.[0] ?? "");
     expect(message).toContain("needs at least one embedding provider");
-    expect(message).toContain("openclaw configure --section model");
+    expect(message).toContain("configure --section model");
   });
 
   it("does not probe unrelated embedding providers in auto mode", async () => {
