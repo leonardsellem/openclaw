@@ -11,6 +11,10 @@ OpenClaw can install plugins from three external ecosystems: **Codex**, **Claude
 and **Cursor**. These are called **bundles** — content and metadata packs that
 OpenClaw maps into native features like skills, hooks, and MCP tools.
 
+OpenClaw also ships a bundled native plugin for shell-command rewriting:
+`extensions/rtk-rewrite`. It hooks `before_tool_call`, so any routed `exec` or
+`bash` tool call gets RTK-rewritten before the shell runs.
+
 <Info>
   Bundles are **not** the same as native OpenClaw plugins. Native plugins run
   in-process and can register any capability. Bundles are content packs with

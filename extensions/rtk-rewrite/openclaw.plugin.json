@@ -1,0 +1,24 @@
+{
+  "id": "rtk-rewrite",
+  "enabledByDefault": true,
+  "name": "RTK Rewrite",
+  "description": "Rewrites exec-style tool commands through RTK before the shell tool runs.",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "enabled": { "type": "boolean" },
+      "verbose": { "type": "boolean" }
+    }
+  },
+  "uiHints": {
+    "enabled": {
+      "label": "Enable RTK Rewrite",
+      "help": "Rewrite exec/bash tool commands through rtk before they run."
+    },
+    "verbose": {
+      "label": "Log Rewrites",
+      "help": "Log when RTK changes a command before execution."
+    }
+  }
+}
