@@ -7,6 +7,7 @@ type RtkRewritePluginConfig = {
 };
 
 const SUPPORTED_TOOL_NAMES = new Set(["exec", "bash"]);
+const RTK_REWRITE_TIMEOUT_MS = 2_000;
 let rtkAvailable: boolean | undefined;
 
 function isRtkAvailable(): boolean {
@@ -22,6 +23,7 @@ function rewriteCommand(command: string): string | undefined {
   const result = spawnSync("rtk", ["rewrite", command], {
     encoding: "utf8",
     maxBuffer: 1024 * 1024,
+    timeout: RTK_REWRITE_TIMEOUT_MS,
   });
   if (result.status !== 0 || result.error) {
     return undefined;
@@ -46,28 +48,32 @@ const plugin = definePluginEntry({
       api.logger.warn("rtk-rewrite: rtk not found on PATH; leaving exec commands unchanged.");
       return;
     }
-    api.on("before_tool_call", (event) => {
-      if (!SUPPORTED_TOOL_NAMES.has(event.toolName)) {
-        return;
-      }
-      const command = event.params.command;
-      if (typeof command !== "string" || command.trim().length === 0) {
-        return;
-      }
-      const rewritten = rewriteCommand(command);
-      if (!rewritten) {
-        return;
-      }
-      if (config.verbose) {
-        api.logger.info(`rtk-rewrite: ${event.toolName} command rewritten`);
-      }
-      return {
-        params: {
-          ...event.params,
-          command: rewritten,
-        },
-      };
-    });
+    api.on(
+      "before_tool_call",
+      (event) => {
+        if (!SUPPORTED_TOOL_NAMES.has(event.toolName)) {
+          return;
+        }
+        const command = event.params.command;
+        if (typeof command !== "string" || command.trim().length === 0) {
+          return;
+        }
+        const rewritten = rewriteCommand(command);
+        if (!rewritten) {
+          return;
+        }
+        if (config.verbose) {
+          api.logger.info(`rtk-rewrite: ${event.toolName} command rewritten`);
+        }
+        return {
+          params: {
+            ...event.params,
+            command: rewritten,
+          },
+        };
+      },
+      { priority: 10 },
+    );
   },
 });
 

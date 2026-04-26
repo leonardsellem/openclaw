@@ -15,6 +15,11 @@ OpenClaw also ships a bundled native plugin for shell-command rewriting:
 `extensions/rtk-rewrite`. It hooks `before_tool_call`, so any routed `exec` or
 `bash` tool call gets RTK-rewritten before the shell runs.
 
+To override it in config, use `plugins.entries.rtk-rewrite`. Set
+`plugins.entries.rtk-rewrite.enabled: false` to disable the rewrite hook, or
+set `plugins.entries.rtk-rewrite.config.verbose: true` to log when a routed
+command was rewritten.
+
 <Info>
   Bundles are **not** the same as native OpenClaw plugins. Native plugins run
   in-process and can register any capability. Bundles are content packs with

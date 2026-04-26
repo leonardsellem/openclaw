@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
 import {
   applyXaiModelCompat,
@@ -9,6 +9,15 @@ import {
   GEMINI_UNSUPPORTED_SCHEMA_KEYWORDS,
   XAI_UNSUPPORTED_SCHEMA_KEYWORDS,
 } from "../plugin-sdk/provider-tools.js";
+import {
+  initializeGlobalHookRunner,
+  resetGlobalHookRunner,
+} from "../plugins/hook-runner-global.js";
+import { createMockPluginRegistry } from "../plugins/hooks.test-helpers.js";
+import {
+  __testing as beforeToolCallTesting,
+  consumeAdjustedParamsForToolCall,
+} from "./pi-tools.before-tool-call.js";
 import "./test-helpers/fast-bash-tools.js";
 import "./test-helpers/fast-coding-tools.js";
 import "./test-helpers/fast-openclaw-tools.js";
@@ -85,6 +94,11 @@ function expectNoSubagentControlTools(tools: ReturnType<typeof createOpenClawCod
 
 describe("createOpenClawCodingTools", () => {
   const testConfig: OpenClawConfig = {};
+
+  afterEach(() => {
+    resetGlobalHookRunner();
+    beforeToolCallTesting.adjustedParamsByToolCallId.clear();
+  });
 
   it("preserves action enums in normalized schemas", () => {
     const defaultTools = createOpenClawCodingTools({ config: testConfig, senderIsOwner: true });
@@ -211,6 +225,72 @@ describe("createOpenClawCodingTools", () => {
     expect(names.has("slack")).toBe(false);
     expect(names.has("telegram")).toBe(false);
     expect(names.has("whatsapp")).toBe(false);
+  });
+
+  it.each([
+    {
+      name: "direct Telegram sessions",
+      options: {
+        agentId: "main",
+        sessionKey: "agent:main:telegram:direct:12345",
+        sessionId: "session-telegram",
+        runId: "run-telegram",
+        messageProvider: "telegram",
+      },
+    },
+    {
+      name: "isolated cron turns",
+      options: {
+        agentId: "main",
+        sessionKey: "agent:main:main",
+        sessionId: "session-cron",
+        runId: "run-cron",
+        trigger: "cron" as const,
+        forceMessageTool: true,
+      },
+    },
+    {
+      name: "subagent sessions",
+      options: {
+        agentId: "main",
+        sessionKey: "agent:main:subagent:worker",
+        sessionId: "session-subagent",
+        runId: "run-subagent",
+        spawnedBy: "agent:main:main",
+      },
+    },
+  ])("routes exec through before_tool_call for $name", async ({ options }) => {
+    const beforeToolCall = vi.fn(async () => ({
+      params: { command: "rtk git status" },
+    }));
+    initializeGlobalHookRunner(
+      createMockPluginRegistry([{ hookName: "before_tool_call", handler: beforeToolCall }]),
+    );
+
+    const execTool = createOpenClawCodingTools(options).find((tool) => tool.name === "exec");
+    expect(execTool).toBeDefined();
+
+    await execTool?.execute?.("tool-call-1", { command: "git status" }, undefined, undefined);
+
+    expect(beforeToolCall).toHaveBeenCalledWith(
+      {
+        toolName: "exec",
+        params: { command: "git status" },
+        runId: options.runId,
+        toolCallId: "tool-call-1",
+      },
+      expect.objectContaining({
+        agentId: options.agentId,
+        sessionKey: options.sessionKey,
+        sessionId: options.sessionId,
+        runId: options.runId,
+        toolName: "exec",
+        toolCallId: "tool-call-1",
+      }),
+    );
+    expect(consumeAdjustedParamsForToolCall("tool-call-1", options.runId)).toEqual({
+      command: "rtk git status",
+    });
   });
 
   it("filters session tools for sub-agent sessions by default", () => {

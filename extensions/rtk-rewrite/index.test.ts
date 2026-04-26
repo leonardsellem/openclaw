@@ -40,7 +40,9 @@ describe("rtk-rewrite plugin", () => {
 
     plugin.register(api as any);
 
-    expect(api.on).toHaveBeenCalledWith("before_tool_call", expect.any(Function));
+    expect(api.on).toHaveBeenCalledWith("before_tool_call", expect.any(Function), {
+      priority: 10,
+    });
 
     const execResult = await hooks.before_tool_call?.({
       toolName: "exec",
@@ -84,5 +86,44 @@ describe("rtk-rewrite plugin", () => {
       "rtk-rewrite: rtk not found on PATH; leaving exec commands unchanged.",
     );
     expect(api.on).not.toHaveBeenCalled();
+  });
+
+  it("uses a bounded rewrite timeout", async () => {
+    spawnSync.mockImplementation(
+      (command: string, args: string[], options?: Record<string, unknown>) => {
+        if (command === "rtk" && args[0] === "--version") {
+          return { status: 0, error: undefined, stdout: "rtk 0.37.2\n" };
+        }
+        if (command === "rtk" && args[0] === "rewrite") {
+          expect(options).toMatchObject({
+            encoding: "utf8",
+            maxBuffer: 1024 * 1024,
+            timeout: 2_000,
+          });
+          return { status: 0, error: undefined, stdout: "rtk:pwd\n" };
+        }
+        return { status: 1, error: new Error("unexpected call"), stdout: "" };
+      },
+    );
+
+    const hooks: Record<string, Function> = {};
+    const api = {
+      pluginConfig: { enabled: true },
+      logger: {
+        info: vi.fn(),
+        warn: vi.fn(),
+        error: vi.fn(),
+      },
+      on: vi.fn((hookName: string, handler: Function) => {
+        hooks[hookName] = handler;
+      }),
+    };
+
+    plugin.register(api as any);
+
+    await hooks.before_tool_call?.({
+      toolName: "exec",
+      params: { command: "pwd" },
+    });
   });
 });
