@@ -17,7 +17,7 @@ export type MemoryReadResult = {
   lines?: number;
   nextFrom?: number;
 };
-type MemoryBackend = "builtin" | "qmd";
+type MemoryBackend = "builtin" | "qmd" | "external";
 
 let backend: MemoryBackend = "builtin";
 let workspaceDir = "/workspace";

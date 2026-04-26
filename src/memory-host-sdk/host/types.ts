@@ -21,8 +21,17 @@ export type MemorySyncProgressUpdate = {
   label?: string;
 };
 
+export type MemoryBackendKind = "builtin" | "qmd" | "external";
+
+export type MemoryExternalBackendInfo = {
+  id: string;
+  label?: string;
+  managesEmbeddings?: boolean;
+  managesIndexing?: boolean;
+};
+
 export type MemorySearchRuntimeDebug = {
-  backend: "builtin" | "qmd";
+  backend: MemoryBackendKind;
   configuredMode?: string;
   effectiveMode?: string;
   fallback?: string;
@@ -38,7 +47,7 @@ export type MemoryReadResult = {
 };
 
 export type MemoryProviderStatus = {
-  backend: "builtin" | "qmd";
+  backend: MemoryBackendKind;
   provider: string;
   model?: string;
   requestedProvider?: string;
@@ -71,6 +80,7 @@ export type MemoryProviderStatus = {
     lastError?: string;
     lastProvider?: string;
   };
+  external?: MemoryExternalBackendInfo;
   custom?: Record<string, unknown>;
 };
 

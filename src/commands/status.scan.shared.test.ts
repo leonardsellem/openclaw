@@ -1,5 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { resolveGatewayProbeSnapshot } from "./status.scan.shared.js";
+import {
+  resolveGatewayProbeSnapshot,
+  resolveSharedMemoryStatusSnapshot,
+} from "./status.scan.shared.js";
 
 const mocks = vi.hoisted(() => ({
   buildGatewayConnectionDetailsWithResolvers: vi.fn(),
@@ -138,5 +141,56 @@ describe("resolveGatewayProbeSnapshot", () => {
 
     expect(result.gatewayProbe?.error).toBe("timeout; warn");
     expect(result.gatewayProbeAuthWarning).toBeUndefined();
+  });
+});
+
+describe("resolveSharedMemoryStatusSnapshot", () => {
+  it("preserves external memory backend status details", async () => {
+    const close = vi.fn(async () => {});
+    const probeVectorAvailability = vi.fn(async () => true);
+    const status = vi.fn(() => ({
+      backend: "external" as const,
+      provider: "gbrain",
+      model: "gbrain-query",
+      files: 12,
+      chunks: 34,
+      dirty: false,
+      workspaceDir: "/tmp/workspace",
+      dbPath: "/tmp/workspace/.gbrain",
+      sources: ["memory" as const],
+      external: {
+        id: "gbrain",
+        label: "GBrain",
+        managesEmbeddings: true,
+      },
+    }));
+
+    const result = await resolveSharedMemoryStatusSnapshot({
+      cfg: { agents: { defaults: { memorySearch: {} } } },
+      agentStatus: { defaultId: "main" },
+      memoryPlugin: { enabled: true, slot: "gbrain-memory" },
+      resolveMemoryConfig: () => ({ store: { path: "/tmp/workspace/.memory/store.sqlite" } }),
+      getMemorySearchManager: async () => ({
+        manager: {
+          probeVectorAvailability,
+          status,
+          close,
+        },
+      }),
+    });
+
+    expect(probeVectorAvailability).toHaveBeenCalledTimes(1);
+    expect(status).toHaveBeenCalledTimes(1);
+    expect(close).toHaveBeenCalledTimes(1);
+    expect(result).toMatchObject({
+      agentId: "main",
+      backend: "external",
+      provider: "gbrain",
+      external: {
+        id: "gbrain",
+        label: "GBrain",
+        managesEmbeddings: true,
+      },
+    });
   });
 });

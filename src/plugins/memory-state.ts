@@ -1,6 +1,9 @@
 import type { MemoryCitationsMode } from "../config/types.memory.js";
 import type { OpenClawConfig } from "../config/types.openclaw.js";
-import type { MemorySearchManager } from "../memory-host-sdk/host/types.js";
+import type {
+  MemoryExternalBackendInfo,
+  MemorySearchManager,
+} from "../memory-host-sdk/host/types.js";
 
 export type MemoryPromptSectionBuilder = (params: {
   availableTools: Set<string>;
@@ -91,6 +94,10 @@ export type MemoryRuntimeBackendConfig =
   | {
       backend: "qmd";
       qmd?: MemoryRuntimeQmdConfig;
+    }
+  | {
+      backend: "external";
+      external: MemoryExternalBackendInfo;
     };
 
 export type MemoryPluginRuntime = {
