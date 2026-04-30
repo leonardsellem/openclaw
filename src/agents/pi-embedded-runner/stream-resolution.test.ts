@@ -6,6 +6,7 @@ import {
   describeEmbeddedAgentStreamStrategy,
   resolveEmbeddedAgentApiKey,
   resolveEmbeddedAgentStreamFn,
+  wrapEmbeddedAgentStreamFn,
 } from "./stream-resolution.js";
 
 // Wrap createBoundaryAwareStreamFnForModel with a spy that delegates to the
@@ -84,6 +85,20 @@ describe("describeEmbeddedAgentStreamStrategy", () => {
       }),
     ).toBe("session-custom");
   });
+
+  it("describes Codex responses as boundary-aware even when the session has a default custom stream", () => {
+    expect(
+      describeEmbeddedAgentStreamStrategy({
+        currentStreamFn: vi.fn() as never,
+        shouldUseWebSocketTransport: false,
+        model: {
+          api: "openai-codex-responses",
+          provider: "openai-codex",
+          id: "gpt-5.5",
+        } as never,
+      }),
+    ).toBe("boundary-aware:openai-codex-responses");
+  });
 });
 
 describe("resolveEmbeddedAgentStreamFn", () => {
@@ -130,6 +145,29 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     });
 
     expect(streamFn).not.toBe(streamSimple);
+  });
+
+  it("routes Codex responses custom session streams through boundary-aware transports", async () => {
+    const currentStreamFn = vi.fn(async (_model, _context, options) => options);
+    const innerStreamFn = vi.fn(async (_model, _context, options) => options);
+    overrideBoundaryAwareStreamFnOnce(innerStreamFn as never);
+    const streamFn = resolveEmbeddedAgentStreamFn({
+      currentStreamFn: currentStreamFn as never,
+      shouldUseWebSocketTransport: false,
+      sessionId: "session-1",
+      model: {
+        api: "openai-codex-responses",
+        provider: "openai-codex",
+        id: "gpt-5.5",
+      } as never,
+      resolvedApiKey: "oauth-bearer-token",
+    });
+
+    await expect(
+      streamFn({ provider: "openai-codex", id: "gpt-5.5" } as never, {} as never, {}),
+    ).resolves.toMatchObject({ apiKey: "oauth-bearer-token" });
+    expect(innerStreamFn).toHaveBeenCalledTimes(1);
+    expect(currentStreamFn).not.toHaveBeenCalled();
   });
 
   it("routes GitHub Copilot fallbacks through boundary-aware transports", () => {
@@ -357,5 +395,21 @@ describe("resolveEmbeddedAgentStreamFn", () => {
     await expect(
       streamFn({ provider: "openai-codex", id: "gpt-5.5" } as never, { systemPrompt } as never, {}),
     ).resolves.toMatchObject({ systemPrompt });
+  });
+});
+
+describe("wrapEmbeddedAgentStreamFn", () => {
+  it("injects auth into the final stream after provider wrappers replace the underlying transport", async () => {
+    const finalStreamFn = vi.fn(async (_model, _context, options) => options);
+    const wrapped = wrapEmbeddedAgentStreamFn(finalStreamFn as never, {
+      resolvedApiKey: "oauth-bearer-token",
+      authStorage: undefined,
+      providerId: "openai-codex",
+      runSignal: undefined,
+    });
+
+    await expect(
+      wrapped({ provider: "openai-codex", id: "gpt-5.5" } as never, {} as never, {}),
+    ).resolves.toMatchObject({ apiKey: "oauth-bearer-token" });
   });
 });

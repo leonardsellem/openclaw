@@ -980,7 +980,7 @@ describe("openai transport stream", () => {
     expect(params.input?.[0]).toMatchObject({ role: "developer" });
   });
 
-  it("uses top-level instructions for Codex responses without dropping parity fields", () => {
+  it("uses top-level instructions for Codex responses and omits unsupported PI fields", () => {
     const params = buildOpenAIResponsesParams(
       {
         id: "gpt-5.4",
@@ -1021,14 +1021,11 @@ describe("openai transport stream", () => {
     );
     expect(params.prompt_cache_key).toBe("session-123");
     expect(params.prompt_cache_retention).toBeUndefined();
-    expect(params.metadata).toEqual({
-      openclaw_session_id: "session-123",
-      openclaw_turn_id: "turn-123",
-    });
+    expect(params).not.toHaveProperty("metadata");
     expect(params.store).toBe(false);
-    expect(params.max_output_tokens).toBe(1024);
-    expect(params.temperature).toBe(0.2);
-    expect(params.service_tier).toBe("auto");
+    expect(params).not.toHaveProperty("max_output_tokens");
+    expect(params).not.toHaveProperty("temperature");
+    expect(params).not.toHaveProperty("service_tier");
   });
 
   it("adds minimal user input for Codex responses when only the system prompt is present", () => {

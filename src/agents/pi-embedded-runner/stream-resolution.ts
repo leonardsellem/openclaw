@@ -41,6 +41,11 @@ export function describeEmbeddedAgentStreamStrategy(params: {
   if (params.model.provider === "anthropic-vertex") {
     return "anthropic-vertex";
   }
+  if (shouldForceBoundaryAwareTransport(params.model)) {
+    return createBoundaryAwareStreamFnForModel(params.model)
+      ? `boundary-aware:${params.model.api}`
+      : "session-custom";
+  }
   if (params.currentStreamFn === undefined || params.currentStreamFn === streamSimple) {
     return createBoundaryAwareStreamFnForModel(params.model)
       ? `boundary-aware:${params.model.api}`
@@ -104,7 +109,11 @@ export function resolveEmbeddedAgentStreamFn(params: {
     return createAnthropicVertexStreamFnForModel(params.model);
   }
 
-  if (params.currentStreamFn === undefined || params.currentStreamFn === streamSimple) {
+  if (
+    shouldForceBoundaryAwareTransport(params.model) ||
+    params.currentStreamFn === undefined ||
+    params.currentStreamFn === streamSimple
+  ) {
     const boundaryAwareStreamFn = createBoundaryAwareStreamFnForModel(params.model);
     if (boundaryAwareStreamFn) {
       // Boundary-aware transports read credentials from options.apiKey just
@@ -124,7 +133,11 @@ export function resolveEmbeddedAgentStreamFn(params: {
   return currentStreamFn;
 }
 
-function wrapEmbeddedAgentStreamFn(
+function shouldForceBoundaryAwareTransport(model: EmbeddedRunAttemptParams["model"]): boolean {
+  return model.provider === "openai-codex" && model.api === "openai-codex-responses";
+}
+
+export function wrapEmbeddedAgentStreamFn(
   inner: StreamFn,
   params: {
     runSignal: AbortSignal | undefined;
