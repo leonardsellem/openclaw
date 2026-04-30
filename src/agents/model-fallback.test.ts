@@ -920,6 +920,42 @@ describe("runWithModelFallback", () => {
     ]);
   });
 
+  it("warns explicitly when a fallback succeeds through OpenRouter", async () => {
+    const warnLogs = createWarnLogCapture("openclaw-model-fallback-openrouter-warning-test");
+    try {
+      const cfg = makeCfg({
+        agents: {
+          defaults: {
+            model: {
+              primary: "openai-codex/gpt-5.5",
+              fallbacks: ["openrouter/minimax/minimax-m2.7"],
+            },
+          },
+        },
+      });
+      const run = vi
+        .fn()
+        .mockRejectedValueOnce(Object.assign(new Error("rate limited"), { status: 429 }))
+        .mockResolvedValueOnce("ok");
+
+      const result = await runWithModelFallback({
+        cfg,
+        provider: "openai-codex",
+        model: "gpt-5.5",
+        run,
+      });
+
+      expect(result.result).toBe("ok");
+      expect(result.provider).toBe("openrouter");
+      expect(result.model).toBe("minimax/minimax-m2.7");
+      const warning = await warnLogs.findText("fell back to OpenRouter");
+      expect(warning).toContain("requested=openai-codex/gpt-5.5");
+      expect(warning).toContain("candidate=openrouter/minimax/minimax-m2.7");
+    } finally {
+      warnLogs.cleanup();
+    }
+  });
+
   it("treats normalized default refs as primary and keeps configured fallback chain", async () => {
     const cfg = makeCfg({
       agents: {

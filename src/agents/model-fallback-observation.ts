@@ -5,6 +5,7 @@ import { buildTextObservationFields } from "./pi-embedded-error-observation.js";
 import type { FailoverReason } from "./pi-embedded-helpers.js";
 
 const decisionLog = createSubsystemLogger("model-fallback").child("decision");
+const openRouterFallbackLog = createSubsystemLogger("model-routing").child("openrouter-fallback");
 
 function buildErrorObservationFields(error?: string): {
   errorPreview?: string;
@@ -66,6 +67,52 @@ export type ModelFallbackDecisionParams = {
 
 function formatModelRef(candidate: ModelCandidate): string {
   return `${candidate.provider}/${candidate.model}`;
+}
+
+function isOpenRouterFallbackSuccess(params: ModelFallbackDecisionParams): boolean {
+  if (params.decision !== "candidate_succeeded") {
+    return false;
+  }
+  if (params.candidate.provider.trim().toLowerCase() !== "openrouter") {
+    return false;
+  }
+  if (params.isPrimary === false) {
+    return true;
+  }
+  if ((params.previousAttempts?.length ?? 0) > 0) {
+    return true;
+  }
+  return params.requestedProvider.trim().toLowerCase() !== "openrouter";
+}
+
+function warnOpenRouterFallback(params: ModelFallbackDecisionParams) {
+  const requestedText = `${sanitizeForLog(params.requestedProvider)}/${sanitizeForLog(params.requestedModel)}`;
+  const candidateText = `${sanitizeForLog(params.candidate.provider)}/${sanitizeForLog(params.candidate.model)}`;
+  const reasonText = params.reason ?? params.previousAttempts?.at(-1)?.reason ?? "unknown";
+  const message =
+    `agent fell back to OpenRouter: requested=${requestedText} ` +
+    `candidate=${candidateText} reason=${sanitizeForLog(reasonText)}`;
+  openRouterFallbackLog.warn(message, {
+    event: "model_fallback_openrouter_warning",
+    tags: ["warning", "model_fallback", "openrouter"],
+    runId: params.runId,
+    requestedProvider: params.requestedProvider,
+    requestedModel: params.requestedModel,
+    candidateProvider: params.candidate.provider,
+    candidateModel: params.candidate.model,
+    attempt: params.attempt,
+    total: params.total,
+    reason: params.reason,
+    previousAttempts: params.previousAttempts?.map((attempt) => ({
+      provider: attempt.provider,
+      model: attempt.model,
+      reason: attempt.reason,
+      status: attempt.status,
+      code: attempt.code,
+      ...buildErrorObservationFields(attempt.error),
+    })),
+    consoleMessage: message,
+  });
 }
 
 function buildFallbackStepFields(params: {
@@ -141,6 +188,9 @@ export function logModelFallbackDecision(
     ? ` providerErrorType=${sanitizeForLog(observedError.providerErrorType)}`
     : "";
   const detailSuffix = detailText ? ` detail=${sanitizeForLog(detailText)}` : "";
+  if (isOpenRouterFallbackSuccess(params)) {
+    warnOpenRouterFallback(params);
+  }
   decisionLog.warn("model fallback decision", {
     event: "model_fallback_decision",
     tags: ["error_handling", "model_fallback", params.decision],
